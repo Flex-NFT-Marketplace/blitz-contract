@@ -1,9 +1,12 @@
-mod point {
+mod interfaces {
     mod point;
-    mod interface;
+    mod fuel;
 }
 
-mod blitz {
-    mod blitz;
-    mod interface;
+mod point {
+    mod point;
+}
+
+mod fuel {
+    mod fuel;
 }
