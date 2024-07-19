@@ -6,6 +6,7 @@ edition = "2023_01"
 [dependencies]
 starknet = ">=2.6.3"
 openzeppelin = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v0.13.0" }
+alexandria_storage = { git = "https://github.com/keep-starknet-strange/alexandria.git" }
 
 [scripts]
 test = "snforge test"
