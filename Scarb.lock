@@ -2,9 +2,15 @@
 version = 1
 
 [[package]]
+name = "alexandria_storage"
+version = "0.3.0"
+source = "git+https://github.com/keep-starknet-strange/alexandria.git#0aa7cca8a1acb1f35cff32420614f7f58e38de5e"
+
+[[package]]
 name = "atemu"
 version = "0.1.0"
 dependencies = [
+ "alexandria_storage",
  "openzeppelin",
 ]
 
