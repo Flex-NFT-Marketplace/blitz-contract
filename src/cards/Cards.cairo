@@ -1,13 +1,17 @@
 #[starknet::contract]
 mod Cards {
+    use openzeppelin_token::erc1155::interface::IERC1155MetadataURI;
     use openzeppelin::token::erc1155::erc1155::ERC1155Component::InternalTrait;
     use starknet::{ContractAddress, get_caller_address};
-    use atemu::interfaces::cards::ICardsImpl;
+    use starknet::storage::Map;
+    use atemu::interfaces::ICards::ICardsImpl;
     use openzeppelin::security::{PausableComponent, ReentrancyGuardComponent};
     use openzeppelin::token::erc1155::{ERC1155Component, ERC1155HooksEmptyImpl};
+    use openzeppelin::token::erc1155::interface::IERC1155MetadataURI as MetadataURI;
     use openzeppelin::introspection::src5::SRC5Component;
     use openzeppelin::access::ownable::OwnableComponent;
     use array::ArrayTrait;
+    use core::byte_array::ByteArray;
 
     component!(path: ERC1155Component, storage: erc1155, event: erc1155Event);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
@@ -36,7 +40,7 @@ mod Cards {
     #[storage]
     struct Storage {
         // caller address => is allowed
-        allowedCaller: LegacyMap::<ContractAddress, bool>,
+        allowedCaller: Map::<ContractAddress, bool>,
         #[substorage(v0)]
         erc1155: ERC1155Component::Storage,
         #[substorage(v0)]
@@ -65,14 +69,14 @@ mod Cards {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, owner: ContractAddress, tokenUri: ByteArray,) {
+    fn constructor(ref self: ContractState, owner: ContractAddress, base_uri: ByteArray) {
         self.ownable.initializer(owner);
-        self.erc1155.initializer(tokenUri);
+        self.erc1155.initializer(base_uri);
     }
 
     #[abi(embed_v0)]
     impl CardsImpl of ICardsImpl<ContractState> {
-        fn claimCard(
+        fn claim_card(
             ref self: ContractState, minter: ContractAddress, tokenId: u256, amount: u256
         ) {
             self.reentrancy.start();
@@ -86,9 +90,42 @@ mod Cards {
             self.reentrancy.end();
         }
 
-        fn setAllowedCaller(ref self: ContractState, contract: ContractAddress, allowed: bool) {
+        fn claim_batch_card(
+            ref self: ContractState,
+            minter: ContractAddress,
+            token_ids: Span<u256>,
+            amounts: Span<u256>
+        ) {
+            self.reentrancy.start();
+            let caller = get_caller_address();
+            self.assertOnlyAllowedCaller(caller);
+
+            self
+                .erc1155
+                .batch_mint_with_acceptance_check(minter, token_ids, amounts, array![].span());
+
+            self.reentrancy.end();
+        }
+
+        fn set_allowed_caller(ref self: ContractState, contract: ContractAddress, allowed: bool) {
             self.ownable.assert_only_owner();
             self.allowedCaller.write(contract, allowed);
+        }
+
+        fn set_base_uri(ref self: ContractState, base_uri: ByteArray) {
+            self.ownable.assert_only_owner();
+            self.erc1155._set_base_uri(base_uri);
+        }
+
+        fn token_uri(self: @ContractState, token_id: u256) -> ByteArray {
+            let base_uri = MetadataURI::uri(self.erc1155, token_id);
+            let json_extension: ByteArray = ".json";
+
+            if base_uri.len() == 0 {
+                return "";
+            } else {
+                return format!("{}{}{}", base_uri, token_id, json_extension);
+            }
         }
     }
 

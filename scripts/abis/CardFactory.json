@@ -1,0 +1,493 @@
+[
+  {
+    "type": "impl",
+    "name": "CardFactoryImpl",
+    "interface_name": "atemu::interfaces::ICardFactory::ICardFactory"
+  },
+  {
+    "type": "struct",
+    "name": "core::byte_array::ByteArray",
+    "members": [
+      {
+        "name": "data",
+        "type": "core::array::Array::<core::bytes_31::bytes31>"
+      },
+      {
+        "name": "pending_word",
+        "type": "core::felt252"
+      },
+      {
+        "name": "pending_word_len",
+        "type": "core::integer::u32"
+      }
+    ]
+  },
+  {
+    "type": "struct",
+    "name": "core::integer::u256",
+    "members": [
+      {
+        "name": "low",
+        "type": "core::integer::u128"
+      },
+      {
+        "name": "high",
+        "type": "core::integer::u128"
+      }
+    ]
+  },
+  {
+    "type": "struct",
+    "name": "atemu::interfaces::ICardFactory::CardDistribution",
+    "members": [
+      {
+        "name": "token_id",
+        "type": "core::integer::u256"
+      },
+      {
+        "name": "name",
+        "type": "core::felt252"
+      },
+      {
+        "name": "class",
+        "type": "core::felt252"
+      },
+      {
+        "name": "rarity",
+        "type": "core::felt252"
+      },
+      {
+        "name": "rate",
+        "type": "core::integer::u256"
+      }
+    ]
+  },
+  {
+    "type": "interface",
+    "name": "atemu::interfaces::ICardFactory::ICardFactory",
+    "items": [
+      {
+        "type": "function",
+        "name": "create_card_collectible",
+        "inputs": [
+          {
+            "name": "base_uri",
+            "type": "core::byte_array::ByteArray"
+          },
+          {
+            "name": "pack_address",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "unpack_card_collectible",
+        "inputs": [
+          {
+            "name": "collectible",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "phase_id",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "token_id",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "set_card_collectible_class",
+        "inputs": [
+          {
+            "name": "new_class_hash",
+            "type": "core::starknet::class_hash::ClassHash"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "set_card_pack",
+        "inputs": [
+          {
+            "name": "collectible",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "pack_address",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "add_card_distributions",
+        "inputs": [
+          {
+            "name": "collectible",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "phase_id",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "cards",
+            "type": "core::array::Array::<atemu::interfaces::ICardFactory::CardDistribution>"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "update_card_distributions",
+        "inputs": [
+          {
+            "name": "collectible",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "phase_id",
+            "type": "core::integer::u256"
+          },
+          {
+            "name": "cards",
+            "type": "core::array::Array::<atemu::interfaces::ICardFactory::CardDistribution>"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "get_card_pack",
+        "inputs": [
+          {
+            "name": "collectible",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "get_card_collectible_class",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "core::starknet::class_hash::ClassHash"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "get_all_cards_addresses",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "core::array::Array::<core::starknet::contract_address::ContractAddress>"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "get_card_distribution_phase",
+        "inputs": [
+          {
+            "name": "collectible",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "phase_id",
+            "type": "core::integer::u256"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::array::Array::<atemu::interfaces::ICardFactory::CardDistribution>"
+          }
+        ],
+        "state_mutability": "view"
+      }
+    ]
+  },
+  {
+    "type": "impl",
+    "name": "PragmaVRF",
+    "interface_name": "atemu::factory::CardFactory::IPragmaVRF"
+  },
+  {
+    "type": "struct",
+    "name": "core::array::Span::<core::felt252>",
+    "members": [
+      {
+        "name": "snapshot",
+        "type": "@core::array::Array::<core::felt252>"
+      }
+    ]
+  },
+  {
+    "type": "interface",
+    "name": "atemu::factory::CardFactory::IPragmaVRF",
+    "items": [
+      {
+        "type": "function",
+        "name": "receive_random_words",
+        "inputs": [
+          {
+            "name": "requestor_address",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
+            "name": "request_id",
+            "type": "core::integer::u64"
+          },
+          {
+            "name": "random_words",
+            "type": "core::array::Span::<core::felt252>"
+          },
+          {
+            "name": "calldata",
+            "type": "core::array::Array::<core::felt252>"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      }
+    ]
+  },
+  {
+    "type": "impl",
+    "name": "OwnableMixinImpl",
+    "interface_name": "openzeppelin_access::ownable::interface::OwnableABI"
+  },
+  {
+    "type": "interface",
+    "name": "openzeppelin_access::ownable::interface::OwnableABI",
+    "items": [
+      {
+        "type": "function",
+        "name": "owner",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "transfer_ownership",
+        "inputs": [
+          {
+            "name": "new_owner",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "renounce_ownership",
+        "inputs": [],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "renounceOwnership",
+        "inputs": [],
+        "outputs": [],
+        "state_mutability": "external"
+      }
+    ]
+  },
+  {
+    "type": "constructor",
+    "name": "constructor",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "card_collectible_class",
+        "type": "core::starknet::class_hash::ClassHash"
+      },
+      {
+        "name": "randomness_contract_address",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "eth_address",
+        "type": "core::starknet::contract_address::ContractAddress"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "atemu::factory::CardFactory::CardFactory::CreateCard",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "owner",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "key"
+      },
+      {
+        "name": "collectible",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "pack_address",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "atemu::factory::CardFactory::CardFactory::UnpackPack",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "caller",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "key"
+      },
+      {
+        "name": "collectible",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "pack_address",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "token_id",
+        "type": "core::integer::u256",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferred",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "previous_owner",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "key"
+      },
+      {
+        "name": "new_owner",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "key"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferStarted",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "previous_owner",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "key"
+      },
+      {
+        "name": "new_owner",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "key"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_access::ownable::ownable::OwnableComponent::Event",
+    "kind": "enum",
+    "variants": [
+      {
+        "name": "OwnershipTransferred",
+        "type": "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferred",
+        "kind": "nested"
+      },
+      {
+        "name": "OwnershipTransferStarted",
+        "type": "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferStarted",
+        "kind": "nested"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_security::reentrancyguard::ReentrancyGuardComponent::Event",
+    "kind": "enum",
+    "variants": []
+  },
+  {
+    "type": "event",
+    "name": "atemu::factory::CardFactory::CardFactory::Event",
+    "kind": "enum",
+    "variants": [
+      {
+        "name": "CreateCard",
+        "type": "atemu::factory::CardFactory::CardFactory::CreateCard",
+        "kind": "nested"
+      },
+      {
+        "name": "UnpackPack",
+        "type": "atemu::factory::CardFactory::CardFactory::UnpackPack",
+        "kind": "nested"
+      },
+      {
+        "name": "OwnableEvent",
+        "type": "openzeppelin_access::ownable::ownable::OwnableComponent::Event",
+        "kind": "flat"
+      },
+      {
+        "name": "ReentrancyGuardEvent",
+        "type": "openzeppelin_security::reentrancyguard::ReentrancyGuardComponent::Event",
+        "kind": "flat"
+      }
+    ]
+  }
+]

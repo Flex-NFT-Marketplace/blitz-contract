@@ -1,17 +1,16 @@
 mod interfaces {
-    mod point;
-    mod fuel;
-    mod cards;
-}
-
-mod point {
-    mod point;
-}
-
-mod fuel {
-    mod fuel;
+    mod ICards;
+    mod ICardFactory;
 }
 
 mod cards {
-    mod cards;
+    mod Cards;
+}
+
+mod factory {
+    mod CardFactory;
+}
+
+mod test {
+    mod MyNFT;
 }

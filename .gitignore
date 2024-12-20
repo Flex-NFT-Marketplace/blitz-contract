@@ -1,2 +1,102 @@
 target
 deployment
+
+# Node.js core
+node_modules/
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs
+*.log
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Dependency directories
+jspm_packages/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Cache and build files
+.cache/
+build/
+dist/
+tmp/
+out/
+coverage/
+**/coverage/*
+.cache-loader/
+.vscode/
+
+# Editor and IDE files
+.idea/
+.vscode/
+*.swp
+
+# Lint and formatting files
+.eslintcache
+.prettierignore
+
+# Test and debug files
+*.test.js
+*.spec.js
+*.test.ts
+*.spec.ts
+.nyc_output/
+
+# Miscellaneous
+*.bak
+*.old
+*.orig
+*.rej
+
+# Optional npm cache directory
+.npm/
+
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Compiled JavaScript files
+*.min.js
+*.map
+
+# SASS / CSS
+*.css.map
+
+# Static files and temporary storage
+public/
+.sass-cache/
+*.css.map
+
+# Next.js or other frameworks
+.next/
+.nuxt/
+.serverless/
+.expo/
+expo/
+
+# MacOS System Files
+.DS_Store
+
+# Windows System Files
+Thumbs.db
+
+# Linux System Files
+*.lock
