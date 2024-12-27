@@ -41,13 +41,14 @@ mod CardFactory {
     impl InternalImpl = OwnableComponent::InternalImpl<ContractState>;
     impl ReentrancyGuardInternalImpl = ReentrancyGuardComponent::InternalImpl<ContractState>;
 
-    use atemu::interfaces::ICardFactory::{ICardFactory, PackTokenDetail, CardDistribution};
+    use atemu::interfaces::ICardFactory::{
+        ICardFactory, PackTokenDetail, CardDistribution, PackCardDetail
+    };
     use atemu::interfaces::ICards::{ICardsImplDispatcher, ICardsImplDispatcherTrait};
 
     #[storage]
     struct Storage {
         is_card_collectible: Map<ContractAddress, bool>,
-        mapping_card_pack: Map<ContractAddress, ContractAddress>,
         all_card_collectibles: Vec<ContractAddress>,
         eth_dispatcher: IERC20Dispatcher,
         nonce: u64,
@@ -56,6 +57,10 @@ mod CardFactory {
         card_collectible_class: ClassHash,
         collectible_salt: u256,
         mapping_card_distribution: Map<(ContractAddress, u256), Vec<CardDistribution>>,
+        mapping_card_all_phase: Map<ContractAddress, Vec<PackCardDetail>>,
+        mapping_card_pack_details: Map<(ContractAddress, u256), PackCardDetail>,
+        callback_fee_limit: u128,
+        max_callback_fee_deposit: u256,
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
         #[substorage(v0)]
@@ -65,8 +70,10 @@ mod CardFactory {
     #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
-        CreateCard: CreateCard,
+        SetUnpackCardPhase: SetUnpackCardPhase,
         UnpackPack: UnpackPack,
+        CardsMinted: CardsMinted,
+        SetDistributions: SetDistributions,
         #[flat]
         OwnableEvent: OwnableComponent::Event,
         #[flat]
@@ -74,11 +81,13 @@ mod CardFactory {
     }
 
     #[derive(Drop, Copy, starknet::Event)]
-    struct CreateCard {
+    struct SetUnpackCardPhase {
         #[key]
         owner: ContractAddress,
         collectible: ContractAddress,
-        pack_address: ContractAddress
+        pack_address: ContractAddress,
+        phase_id: u256,
+        num_cards: u32
     }
 
     #[derive(Drop, Copy, starknet::Event)]
@@ -90,18 +99,35 @@ mod CardFactory {
         token_id: u256
     }
 
+    #[derive(Drop, Copy, starknet::Event)]
+    struct CardsMinted {
+        request_id: u64,
+        minter: ContractAddress,
+        card_collectible: ContractAddress,
+        num_cards: u32,
+        token_ids_span: Span<u256>
+    }
+
+    #[derive(Drop, Copy, starknet::Event)]
+    struct SetDistributions {
+        collectible: ContractAddress,
+        phase_id: u256,
+        total_cards: u32,
+    }
+
     mod Errors {
         pub const CALLER_NOT_RANDOMNESS: felt252 = 'Caller not randomness contract';
         pub const INVALID_ADDRESS: felt252 = 'Invalid address';
         pub const REQUESTOR_NOT_SELF: felt252 = 'Requestor is not self';
         pub const INVALID_PACK_OWNER: felt252 = 'Caller not Pack Owner';
-        pub const INVALID_Collectible: felt252 = 'Only Card Collectible';
+        pub const INVALID_COLLECTIBLE: felt252 = 'Only Card Collectible';
+        pub const INVALID_PHASE_ID: felt252 = 'Only Existed Phase';
+        pub const PACK_ADDRESS_NOT_FOUND: felt252 = 'Pack address not found';
+        pub const INVALID_NUMBER: felt252 = 'Invalid number';
     }
 
     pub const PUBLISH_DELAY: u64 = 1; // return the random value asap
-    pub const NUM_OF_WORDS: u64 = 1; // 5 numbers
-    pub const CALLBACK_FEE_LIMIT: u128 = 100_000_000_000_000_0; // 0.005 ETH
-    pub const MAX_CALLBACK_FEE_DEPOSIT: u256 = 500_000_000_000_000_0; // CALLBACK_FEE_LIMIT * 5; 
+    pub const NUM_OF_WORDS: u64 = 1; // 1 numbers
 
     const TWO_TO_THE_50: u256 = 1125899906842624; // This is 2^50 in decimal
 
@@ -114,11 +140,17 @@ mod CardFactory {
         owner: ContractAddress,
         card_collectible_class: ClassHash,
         randomness_contract_address: ContractAddress,
-        eth_address: ContractAddress
+        eth_address: ContractAddress,
+        callback_fee_limit: u128,
+        max_callback_fee_deposit: u256,
     ) {
         assert(randomness_contract_address.is_non_zero(), Errors::INVALID_ADDRESS);
         assert(eth_address.is_non_zero(), Errors::INVALID_ADDRESS);
+        assert(callback_fee_limit != 0, Errors::INVALID_NUMBER);
+        assert(max_callback_fee_deposit != 0, Errors::INVALID_NUMBER);
         self.ownable.initializer(owner);
+        self.callback_fee_limit.write(callback_fee_limit);
+        self.max_callback_fee_deposit.write(max_callback_fee_deposit);
         self.card_collectible_class.write(card_collectible_class);
         self.randomness_contract_address.write(randomness_contract_address);
         self.eth_dispatcher.write(IERC20Dispatcher { contract_address: eth_address });
@@ -127,7 +159,10 @@ mod CardFactory {
     #[abi(embed_v0)]
     impl CardFactoryImpl of ICardFactory<ContractState> {
         fn create_card_collectible(
-            ref self: ContractState, base_uri: ByteArray, pack_address: ContractAddress,
+            ref self: ContractState,
+            base_uri: ByteArray,
+            pack_address: ContractAddress,
+            num_cards: u32
         ) {
             self.reentrancyguard.start();
             assert(pack_address.is_non_zero(), Errors::INVALID_ADDRESS);
@@ -160,9 +195,20 @@ mod CardFactory {
 
             self.is_card_collectible.entry(collectible).write(true);
             self.all_card_collectibles.append().write(collectible);
-            self.mapping_card_pack.entry(collectible).write(pack_address);
 
-            self.emit(CreateCard { owner: caller, collectible, pack_address });
+            let phase_id = 1;
+            let pack_card_detail = PackCardDetail {
+                pack_address, card_collectible: collectible, phase_id, num_cards
+            };
+
+            self.mapping_card_pack_details.entry((collectible, phase_id)).write(pack_card_detail);
+            self.mapping_card_all_phase.entry(collectible).append().write(pack_card_detail);
+            self
+                .emit(
+                    SetUnpackCardPhase {
+                        owner: caller, collectible, pack_address, phase_id, num_cards
+                    }
+                );
             self.reentrancyguard.end();
         }
 
@@ -170,9 +216,11 @@ mod CardFactory {
             ref self: ContractState, collectible: ContractAddress, phase_id: u256, token_id: u256
         ) {
             self.assert_only_card_collectible(collectible);
+            self.assert_only_existed_phase_id(collectible, phase_id);
             let caller = get_caller_address();
 
-            let pack_address = self.get_card_pack(collectible);
+            let phase_details = self.get_unpack_card_details(collectible, phase_id);
+            let pack_address = phase_details.pack_address;
             let pack_dispatcher = IERC721Dispatcher { contract_address: pack_address };
             assert(pack_dispatcher.owner_of(token_id) == caller, Errors::INVALID_PACK_OWNER);
             pack_dispatcher.transfer_from(caller, get_contract_address(), token_id);
@@ -187,17 +235,72 @@ mod CardFactory {
             self.emit(UnpackPack { caller, collectible, pack_address, token_id });
         }
 
-        fn set_card_pack(
-            ref self: ContractState, collectible: ContractAddress, pack_address: ContractAddress
+        fn update_pack_card_details(
+            ref self: ContractState,
+            collectible: ContractAddress,
+            pack_address: ContractAddress,
+            num_cards: u32
         ) {
             self.ownable.assert_only_owner();
             self.assert_only_card_collectible(collectible);
-            self.mapping_card_pack.entry(collectible).write(pack_address);
+            let phase_id = self.get_phase_id(collectible, pack_address);
+
+            let new_card_pack_details = PackCardDetail {
+                pack_address, card_collectible: collectible, phase_id, num_cards
+            };
+            self
+                .mapping_card_pack_details
+                .entry((collectible, phase_id))
+                .write(new_card_pack_details);
+
+            self
+                .emit(
+                    SetUnpackCardPhase {
+                        owner: self.ownable.owner(), collectible, pack_address, phase_id, num_cards
+                    }
+                );
         }
 
         fn set_card_collectible_class(ref self: ContractState, new_class_hash: ClassHash) {
             self.ownable.assert_only_owner();
             self.card_collectible_class.write(new_class_hash);
+        }
+
+        fn set_callback_fee_limit(ref self: ContractState, callback_fee_limit: u128) {
+            self.ownable.assert_only_owner();
+            self.callback_fee_limit.write(callback_fee_limit);
+        }
+
+        fn set_max_callback_fee_deposit(ref self: ContractState, max_callback_fee_deposit: u256) {
+            self.ownable.assert_only_owner();
+            self.max_callback_fee_deposit.write(max_callback_fee_deposit);
+        }
+
+        fn create_new_phase(
+            ref self: ContractState,
+            collectible: ContractAddress,
+            pack_address: ContractAddress,
+            num_cards: u32
+        ) {
+            self.ownable.assert_only_owner();
+            self.assert_only_card_collectible(collectible);
+
+            let mut phase_id = self.get_phase_id(collectible, pack_address);
+            phase_id += 1;
+
+            let pack_card_detail = PackCardDetail {
+                pack_address, card_collectible: collectible, phase_id, num_cards
+            };
+
+            self.mapping_card_pack_details.entry((collectible, phase_id)).write(pack_card_detail);
+            self.mapping_card_all_phase.entry(collectible).append().write(pack_card_detail);
+
+            self
+                .emit(
+                    SetUnpackCardPhase {
+                        owner: self.ownable.owner(), collectible, pack_address, phase_id, num_cards
+                    }
+                );
         }
 
         fn add_card_distributions(
@@ -208,6 +311,7 @@ mod CardFactory {
         ) {
             self.ownable.assert_only_owner();
             self.assert_only_card_collectible(collectible);
+            self.assert_only_existed_phase_id(collectible, phase_id);
 
             let storage_vec = self.mapping_card_distribution.entry((collectible, phase_id));
 
@@ -215,7 +319,9 @@ mod CardFactory {
                 ..cards.len() {
                     let card = cards.at(i);
                     storage_vec.append().write(card.clone());
-                }
+                };
+
+            self.emit(SetDistributions { collectible, phase_id, total_cards: cards.len() })
         }
 
         fn update_card_distributions(
@@ -226,38 +332,103 @@ mod CardFactory {
         ) {
             self.ownable.assert_only_owner();
             self.assert_only_card_collectible(collectible);
+            self.assert_only_existed_phase_id(collectible, phase_id);
 
             let storage_vec = self.mapping_card_distribution.entry((collectible, phase_id));
-
-            let existing_length = storage_vec.len();
-            for i in 0
-                ..existing_length {
-                    storage_vec
-                        .at(i)
-                        .write(
-                            CardDistribution {
-                                token_id: 0,
-                                name: 0,
-                                class: 0,
-                                rarity: 0,
-                                rate: u256 { low: 0, high: 0 }
-                            }
-                        );
-                };
+            let length: u32 = storage_vec.len().try_into().unwrap();
 
             for i in 0
-                ..cards.len() {
-                    let card = cards.at(i);
-                    storage_vec.append().write(card.clone());
-                }
+                ..cards
+                    .len() {
+                        let card = cards.at(i);
+                        let index: u64 = i.try_into().unwrap();
+                        if i < length {
+                            storage_vec.at(index).write(card.clone());
+                        } else {
+                            storage_vec.append().write(card.clone());
+                        }
+                    };
+
+            if cards.len() < length {
+                let excess_count = length - cards.len();
+                let start_index = cards.len();
+
+                for i in start_index
+                    ..start_index
+                        + excess_count {
+                            let index: u64 = i.try_into().unwrap();
+                            storage_vec
+                                .at(index)
+                                .write(
+                                    CardDistribution {
+                                        token_id: 0,
+                                        name: 0,
+                                        class: 0,
+                                        rarity: 0,
+                                        rate: u256 { low: 0, high: 0 },
+                                    }
+                                );
+                        }
+            }
+
+            self.emit(SetDistributions { collectible, phase_id, total_cards: cards.len() })
         }
 
-        fn get_card_pack(self: @ContractState, collectible: ContractAddress) -> ContractAddress {
-            self.mapping_card_pack.entry(collectible).read()
+        fn get_all_phase_for_card(
+            self: @ContractState, collectible: ContractAddress
+        ) -> Array<PackCardDetail> {
+            let all_phases = self.mapping_card_all_phase.entry(collectible);
+
+            if all_phases.len() == 0 {
+                return ArrayTrait::<PackCardDetail>::new();
+            }
+
+            let mut phases = ArrayTrait::new();
+            for i in 0..all_phases.len() {
+                phases.append(all_phases.at(i).read());
+            };
+            phases
+        }
+
+        fn get_unpack_card_details(
+            self: @ContractState, collectible: ContractAddress, phase_id: u256
+        ) -> PackCardDetail {
+            let phase_details = self
+                .mapping_card_pack_details
+                .entry((collectible, phase_id))
+                .read();
+            phase_details
+        }
+
+        fn get_phase_id(
+            self: @ContractState, collectible: ContractAddress, pack_address: ContractAddress
+        ) -> u256 {
+            let pack_details = self.mapping_card_all_phase.entry(collectible);
+
+            let mut phase_id = 0;
+            for i in 0
+                ..pack_details
+                    .len() {
+                        let detail = pack_details.at(i).read();
+                        if detail.pack_address == pack_address {
+                            phase_id = detail.phase_id;
+                            break;
+                        }
+                    };
+
+            phase_id
         }
 
         fn get_card_collectible_class(self: @ContractState) -> ClassHash {
             self.card_collectible_class.read()
+        }
+
+        fn get_callback_fee_limit(self: @ContractState) -> u128 {
+            self.callback_fee_limit.read()
+        }
+
+        fn get_max_callback_fee_deposit(self: @ContractState) -> u256 {
+            self.max_callback_fee_deposit.read()
         }
 
         fn get_all_cards_addresses(self: @ContractState) -> Array<ContractAddress> {
@@ -314,7 +485,16 @@ mod CardFactory {
     impl InternalFactoryImpl of InternalImplTrait {
         fn assert_only_card_collectible(self: @ContractState, collectible: ContractAddress) {
             let is_card_collectible = self.is_card_collectible.entry(collectible).read();
-            assert(is_card_collectible, Errors::INVALID_Collectible);
+            assert(is_card_collectible, Errors::INVALID_COLLECTIBLE);
+        }
+        fn assert_only_existed_phase_id(
+            self: @ContractState, collectible: ContractAddress, phase_id: u256
+        ) {
+            let pack = self.mapping_card_pack_details.entry((collectible, phase_id)).read();
+
+            let pack_phase_id = pack.phase_id;
+
+            assert(pack_phase_id != 0, Errors::INVALID_PHASE_ID);
         }
         fn _request_randomness(ref self: ContractState) -> u64 {
             let randomness_contract_address = self.randomness_contract_address.read();
@@ -323,17 +503,18 @@ mod CardFactory {
             };
 
             let this = get_contract_address();
-
+            let max_callback_fee_deposit = self.max_callback_fee_deposit.read();
             // Approve the randomness contract to transfer the callback deposit/fee
             let eth_dispatcher = self.eth_dispatcher.read();
-            eth_dispatcher.approve(randomness_contract_address, MAX_CALLBACK_FEE_DEPOSIT);
+            eth_dispatcher.approve(randomness_contract_address, max_callback_fee_deposit);
 
             let nonce = self.nonce.read();
+            let callback_fee_limit = self.callback_fee_limit.read();
 
             // Request the randomness to be used to construct the winning combination
             let request_id = randomness_dispatcher
                 .request_random(
-                    nonce, this, CALLBACK_FEE_LIMIT, PUBLISH_DELAY, NUM_OF_WORDS, array![]
+                    nonce, this, callback_fee_limit, PUBLISH_DELAY, NUM_OF_WORDS, array![]
                 );
 
             self.nonce.write(nonce + 1);
@@ -348,9 +529,12 @@ mod CardFactory {
             let minter = pack_token_detail.minter;
             let phase_id = pack_token_detail.phase_id;
 
+            let phase_details = self.get_unpack_card_details(card_collectible, phase_id);
+            let num_cards = phase_details.num_cards;
+
             let card_dispatcher = ICardsImplDispatcher { contract_address: card_collectible };
             let selected_cards = self
-                ._select_random_cards(card_collectible, phase_id, random_words, 5);
+                ._select_random_cards(card_collectible, phase_id, random_words, num_cards);
 
             let mut token_ids_array = array![];
             let mut amounts_array = array![];
@@ -368,6 +552,10 @@ mod CardFactory {
             // Mint the selected cards using claim_batch_card
             let token_ids_span = token_ids_array.span();
             let amounts_span = amounts_array.span();
+            self
+                .emit(
+                    CardsMinted { request_id, minter, card_collectible, num_cards, token_ids_span }
+                );
 
             card_dispatcher.claim_batch_card(minter, token_ids_span, amounts_span);
         }

@@ -119,12 +119,11 @@ mod Cards {
 
         fn token_uri(self: @ContractState, token_id: u256) -> ByteArray {
             let base_uri = MetadataURI::uri(self.erc1155, token_id);
-            let json_extension: ByteArray = ".json";
 
             if base_uri.len() == 0 {
                 return "";
             } else {
-                return format!("{}{}{}", base_uri, token_id, json_extension);
+                return format!("{}{}", base_uri, token_id);
             }
         }
     }
